@@ -1,0 +1,234 @@
+---
+title: "Undernutrition Project"
+author: "Marissa Piteo"
+date: "7/13/2020"
+output: html_document
+bibliography: Project.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Visualizing, Summarising, and Modeling Important Factors for Global Undernutrition
+
+Creating compelling visuals that show the world's most undernourished countries, and modeling the most important factors and short comings of these nations.
+
+# Introduction
+
+World hunger is a major problem throughout the world. There is a significant number of people, around 1.02 billion, fighting for their lives due to hunger and issues arising from being undernourished. It is a major cause of death and is related to many other diseases, such as heart issues. Hunger is a condition where individuals lack the nutrients they need such as calories, protein, and fat in order to be healthy and function daily. Undernutrition is the result of deficiencies of nutrients due to this extreme hunger. Although there are many causes of hunger and undernutriton, a major one is economic instability. Poverty plays a large role in people's fight for addressing their nutrition issues and hunger. There are 1.2 billion people living on less than a dollar a day who cannot afford food or the essentials for healthy living. Many countries who face particularly intense hunger are provided with programs and donations through various organizations such as Action Against Hunger (AAH). Due to the importance of world hunger/undernourishment and the detramental effects it has on many people throughout the world, this project is to demonstarte relationships between undernourishment throughout the world with factors effecting, helping, and contributing to it. This project code looks at data of undernourished individuals in countries throughout the world, visualize this data through maps with gradients, compare fat, protein, and calories to the percentage of undernourished people in these countries, look at poverty rates compared to percentage of undernourished individuals in these countries, and look at how organizations, specifically AAH, impact in aiding in undernourishment in the top most undernurished countries. 
+
+
+# Required Packages  
+
+These are the r packages required for this project.
+```{r, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(maptools)
+library(viridisLite)
+library(tidymodels)
+```
+
+
+# Reading in Raw Data
+
+This section of code reads in the raw data that contains the number of undernourished people in each country over time. It removes larger regions and repeats so that it is specific only to each country.  
+```{r, cache=TRUE, message=FALSE}
+World_Malnutrition_Numbers <- read.csv('/Users/marissapiteo/Downloads/number-undernourished.csv')
+World_Malnutrition_Numbers <- World_Malnutrition_Numbers[order(-World_Malnutrition_Numbers$Suite.of.Food.Security.Indicators...Number.of.people.undernourished..million...3.year.average....210011...Value...6132...millions..people.),]
+To_be_removed <- c('Africa', 'Asia', 'Asia, Central', 'Caribbean', 'Central America', 'Central and Southern Asia', 'East Asia (exc China)', 'Eastern Africa', 'Eastern and South-Eastern Asia', 'Eastern Asia', 'Eastern Europe', 'Land Locked Developing Countries', 'Latin America and the Caribbean', 'Least Developed Countries', 'Low income', 'Low Income Food Deficit Countries', 'Lower middle income', 'Middle Africa', 'North Africa (exc Sudan)', 'Northern Africa', 'Northern Africa and Western Asia', 'Oceania', 'Small island developing States', 'South America', 'South Asia (exc India)', 'South Eastern Asia', 'Southern Africa', 'Southern Asia', 'Sub-Saharan Africa', 'Sub-Saharan Africa (inc. Sudan)','Upper middle income', 'Western Africa', 'Western Asia', 'World')
+Country_Malnutrition_Numbers <- filter(World_Malnutrition_Numbers, !Entity %in% To_be_removed)
+Country_Malnutrition_Numbers <- filter(Country_Malnutrition_Numbers, Code != '')
+Country_Malnutrition_Numbers <- rename(Country_Malnutrition_Numbers, "Number of People Undernourished" = "Suite.of.Food.Security.Indicators...Number.of.people.undernourished..million...3.year.average....210011...Value...6132...millions..people.")
+head(Country_Malnutrition_Numbers)
+```
+
+# Summarizing Raw Data as an Average
+
+This section of code takes the data and averages all of the years and gives an average of the five years (2013-2017). Then it converts it to a log scale. 
+``` {r, message=FALSE}
+Country_Malnutrition_Numbers <- filter(Country_Malnutrition_Numbers, Year > 2012)
+Country_Averages <- Country_Malnutrition_Numbers %>%
+                                 group_by(Entity) %>%
+                                 summarise(Average_Log=sum(`Number of People Undernourished`/5))
+Country_Averages <- as.data.frame(Country_Averages)
+Country_Averages <- Country_Averages[order(-Country_Averages$Average_Log),]
+Country_Averages[2] <- log10(Country_Averages[2])
+Country_Malnutrition_Numbers <- left_join(Country_Malnutrition_Numbers, Country_Averages, by = 'Entity')
+head(Country_Malnutrition_Numbers)
+```
+
+
+# Visualizing World Hunger in a Map
+
+This section makes the world map with color gradient from most to least undernourished. 
+``` {r, cache=TRUE, message=FALSE}
+world_map <- map_data('world')
+world_map <- filter(world_map, region != 'Antarctica')
+map_hunger_df <- left_join(world_map, Country_Averages, by = c('region' = 'Entity')) 
+ggplot(data = map_hunger_df, aes(x = long, y = lat, group = group)) + 
+  geom_polygon(aes(fill = Average_Log)) +
+  scale_fill_viridis_c(direction = -1) +
+  labs(x = 'Longitude', y = 'Latitude')
+ggsave("World.Hunger.Map.png")
+```
+
+
+# Highlighting the Top 10
+
+This section edits to make the map with a color gradient of only the top ten most undernourished countries for future graphs. 
+``` {r, message=FALSE}
+Top_10 <- slice(Country_Averages, (1:10))
+Top_10_Map <- left_join(world_map, Top_10, by = c('region' = 'Entity'))
+ggplot(data = Top_10_Map, aes(x = long, y = lat, group = group)) + 
+  geom_polygon(aes(fill = Average_Log)) +
+  scale_fill_viridis_c(direction = -1) +
+  labs(x = 'Longitude', y = 'Latitude')
+ggsave("Top.10.Countries.Hunger.Map.png")
+```
+
+
+# Adjusting Data to Represent Percentage
+
+This section of code creates a new table that will be expanded on in order to represent a more complete view of what it means to be undernourished. It also adds in the population for each country from 2016 with a percentage of each population that is undernourished. 
+``` {r, cache=TRUE, message=FALSE}
+Undernutrition_Profile <- Country_Malnutrition_Numbers %>%
+  group_by(Entity) %>%
+  summarise(Average=sum(`Number of People Undernourished`/5))
+Undernutrition_Profile <- as.data.frame(Undernutrition_Profile)
+Undernutrition_Profile <- Undernutrition_Profile[order(-Undernutrition_Profile$Average),]
+Country_Populations <- read.csv('/Users/marissapiteo/Downloads/population-figures-by-country-csv_csv.csv')
+Country_Populations <- select(Country_Populations, Country, Year_2016)
+Undernutrition_Profile <- left_join(Country_Populations, Undernutrition_Profile, by = c('Country'= 'Entity')) %>% 
+  na.omit()
+Undernutrition_Profile <- rename(Undernutrition_Profile, 'Population' = 'Year_2016')
+Undernutrition_Profile <- mutate(Undernutrition_Profile, Percentage = Average/Population * 100)
+Undernutrition_Profile <- Undernutrition_Profile[order(-Undernutrition_Profile$Percentage),]
+head(Undernutrition_Profile)
+```
+
+
+# Modeling the Importance of Calorie Availability
+
+This section reads in data on the amount of calories available per person per day in each country. It puts it into a table, graphs it, and creates a linear aggression model comparing percent of population undernourished with number of calories available. The results show that with more available calories per person per day, there is a smaller percentage of undernourished individuals in these countries.
+``` {r, cache=TRUE, message=FALSE}
+Country_Calorie_Numbers <- read.csv('/Users/marissapiteo/Downloads/food-supply-kcal.csv') 
+Country_Calorie_Numbers <- filter(Country_Calorie_Numbers, Year == 2017)
+Country_Calorie_Numbers <- rename(Country_Calorie_Numbers, 'Daily_Calories' = 'Daily.caloric.supply..kilocalories.per.person.per.day.')
+Country_Calorie_Numbers <- select(Country_Calorie_Numbers, Entity, Daily_Calories)
+Undernutrition_Profile <- left_join(Undernutrition_Profile, Country_Calorie_Numbers, by =c('Country'='Entity'))
+Calorie_eqn <- function(Undernutrition_Profile){
+  m <- lm(Percentage ~ Daily_Calories, Undernutrition_Profile);
+  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+ggplot(Undernutrition_Profile, aes(Daily_Calories, Percentage)) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE, color = 'black') +
+  geom_text(x = 3000, y = 50, label = Calorie_eqn(Undernutrition_Profile), parse = TRUE) 
+```
+
+# Modeling the Importance of Fat Availability
+
+This section reads in data on the amount of fat available per person per day in each country. It puts it into a table, graphs it, and creates a linear aggression model comparing percent of population undernourished with amount of fat available. The results show that with more available fat per person per day, there is a smaller percentage of undernourished individuals in these countries.
+``` {r, cache=TRUE, message=FALSE}
+Country_Fat_Numbers <- read.csv('/Users/marissapiteo/Downloads/daily-per-capita-fat-supply.csv')
+Country_Fat_Numbers <- filter(Country_Fat_Numbers, Year == 2017)
+Country_Fat_Numbers <- rename(Country_Fat_Numbers, 'Daily_Fat' = 'Daily.fat.supply..grams.per.person.per.day.')
+Country_Fat_Numbers <- filter(Country_Fat_Numbers, Daily_Fat <120)
+Country_Fat_Numbers <- select(Country_Fat_Numbers, 'Entity', 'Daily_Fat')
+Undernutrition_Profile <- left_join(Undernutrition_Profile, Country_Fat_Numbers, by = c('Country'='Entity'))
+
+Fat_eqn <- function(Undernutrition_Profile){
+  m <- lm(Percentage ~ Daily_Fat, Undernutrition_Profile);
+  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+ggplot(Undernutrition_Profile, aes(Daily_Fat, Percentage)) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE, color = 'black') +
+  geom_text(x = 100, y = 30, label = Fat_eqn(Undernutrition_Profile), parse = TRUE) +
+  labs(x = 'Daily_Fat [g/person]')
+```
+
+
+# Modeling the Importance of Protein Availability
+
+This section reads in data on the amount of protein available per person per day in each country. It puts it into a table, graphs it, and creates a linear aggression model comparing percent of population undernourished with namount of protein available. The results show that with more availableprotein per person per day, there is a smaller percentage of undernourished individuals in these countries.
+``` {r, cache = TRUE, message=FALSE}
+Country_Protein_Numbers <- read.csv('/Users/marissapiteo/Downloads/daily-per-capita-protein-supply.csv')
+Country_Protein_Numbers <- filter(Country_Protein_Numbers, Year == 2017)
+Country_Protein_Numbers <- rename(Country_Protein_Numbers, 'Daily_Protein' = 'Daily.protein.supply..grams.per.person.per.day.')
+Country_Protein_Numbers <- select(Country_Protein_Numbers, 'Entity', 'Daily_Protein')
+Undernutrition_Profile <- left_join(Undernutrition_Profile, Country_Protein_Numbers, by = c('Country'='Entity'))
+
+Protein_eqn <- function(Undernutrition_Profile){
+  m <- lm(Percentage ~ Daily_Protein, Undernutrition_Profile);
+  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+ggplot(Undernutrition_Profile, aes(Daily_Protein, Percentage)) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE, color = 'black') +
+  geom_text(x = 100, y = 50, label = Protein_eqn(Undernutrition_Profile), parse = TRUE) +
+  labs(x = 'Daily_Protein [g/person]')
+```
+
+
+# The Importance of Poverty 
+
+You type here (adds in a column about percentage of the population living in extreme poverty, under 1.90)
+```{r, message=FALSE, cache=TRUE}
+Country_Poverty_Numbers <- read.csv('/Users/marissapiteo/Downloads/share-of-the-population-living-in-extreme-poverty.csv')
+Country_Poverty_Numbers <- filter(Country_Poverty_Numbers, Year == 2011)
+Country_Poverty_Numbers <- rename(Country_Poverty_Numbers, 'Percentage_Living_Under_$1.90' = 'Share.of.the.population.living.in.extreme.poverty....')
+Country_Poverty_Numbers <- select(Country_Poverty_Numbers, 'Entity', 'Percentage_Living_Under_$1.90')
+Undernutrition_Profile <- left_join(Undernutrition_Profile, Country_Poverty_Numbers, by = c('Country'='Entity'))
+
+```
+
+
+# Creating A Comprehensive Model
+
+You type here (builds a linear regression model that predicts percentage of the population that is undernourished based on the calories, fat, and protein available)
+```{r, message=FALSE}
+Undernutrition_Model <- lm(Percentage ~ Daily_Calories + Daily_Fat + Daily_Protein, data = Undernutrition_Profile)
+summary(Undernutrition_Model)$coefficient
+```
+
+
+# Hope From Charities
+
+You type here (Creates a bar graph about the number of individuals helped by AAH)
+```{r, message=FALSE, cache=TRUE}
+People_Helped_by_AAH_2018 <- c(75530, 0, 334588, 1442297, 832829, 18641, 3488001, 14205, 474505, 302014)
+Top_10 <- mutate(Top_10, People_Helped_by_AAH_2018)
+ggplot(Top_10, aes(Entity, People_Helped_by_AAH_2018)) +
+  geom_col(aes(fill = Entity)) +
+  theme(axis.text.x = element_text(angle = 90), legend.position = 'none') +
+  labs(y = 'AAH People Helped') +
+  scale_fill_viridis_d()
+```
+
+
+# Citations
+
+
+'Country Undernutrition Data' [@owidhungerandundernourishment]
+'Food Availability Data' [@owidfoodsupply]
+Population Data - https://datahub.io/JohnSnowLabs/population-figures-by-country/r/0.html
+Issues and challenges in defeating world hunger - 
+World poverty and hunger-the challenge for science. - https://www-sciencedirect-com.ezproxy.stonehill.edu/science/article/pii/S0924224410001779
+https://go-gale-com.ezproxy.stonehill.edu/ps/retrieve.do?tabID=T002&resultListType=RESULT_LIST&searchResultsType=SingleTab&searchType=BasicSearchForm&currentPosition=5&docId=GALE%7CA85241334&docType=Article&sort=Relevance&contentSegment=ZHCC&prodId=HRCA&contentSet=GALE%7CA85241334&searchId=R11&userGroupName=mlin_s_stonecol&inPS=true&ps=1&cp=5
+'Poverty Data' [@owidextremepoverty]
+AAH Data- https://www.actionagainsthunger.org/countries
