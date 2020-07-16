@@ -546,7 +546,7 @@ ggplot(Undernutrition_Profile, aes(Daily_Protein, Percentage)) +
 </div>
 <div id="the-importance-of-poverty" class="section level1">
 <h1>The Importance of Poverty</h1>
-<p>You type here (adds in a column about percentage of the population living in extreme poverty, under 1.90)</p>
+<p>This section of code looks at how poverty relates to unernourished indiivduals in various countries. It adds a column about extreme poverty (under $1.90 a day). The data was not adequate for a model.</p>
 <pre class="r"><code>Country_Poverty_Numbers &lt;- read.csv('/Users/marissapiteo/Downloads/share-of-the-population-living-in-extreme-poverty.csv')
 Country_Poverty_Numbers &lt;- filter(Country_Poverty_Numbers, Year == 2011)
 Country_Poverty_Numbers &lt;- rename(Country_Poverty_Numbers, 'Percentage_Living_Under_$1.90' = 'Share.of.the.population.living.in.extreme.poverty....')
@@ -555,7 +555,7 @@ Undernutrition_Profile &lt;- left_join(Undernutrition_Profile, Country_Poverty_N
 </div>
 <div id="creating-a-comprehensive-model" class="section level1">
 <h1>Creating A Comprehensive Model</h1>
-<p>You type here (builds a linear regression model that predicts percentage of the population that is undernourished based on the calories, fat, and protein available)</p>
+<p>This section of code builds a linear regression model that predicts percentage of the population that is undernourished based on the calories, fat, and protein available. The results show that of the three factors used to create this model, the number of calories available is the most significant indicator, as is expected. This can be seen by the significantly smaller p value, in the resulting table of coefficients.</p>
 <pre class="r"><code>Undernutrition_Model &lt;- lm(Percentage ~ Daily_Calories + Daily_Fat + Daily_Protein, data = Undernutrition_Profile)
 summary(Undernutrition_Model)$coefficient</code></pre>
 <pre><code>##                   Estimate  Std. Error    t value     Pr(&gt;|t|)
@@ -566,7 +566,7 @@ summary(Undernutrition_Model)$coefficient</code></pre>
 </div>
 <div id="hope-from-charities" class="section level1">
 <h1>Hope From Charities</h1>
-<p>You type here (Creates a bar graph about the number of individuals helped by AAH)</p>
+<p>This section of code creates a bar graph about the number of individuals helped by Action Against Hunger. It shows the top ten most undernourished countries in relation to the number of individuals from those countries that were helped by a nutrition program in 2018.China did not have data for this section. Although some countries reached a greater number of people, it is important to see the benefits of just one of the many organizations aiding in world hunger and undernourishment.</p>
 <pre class="r"><code>People_Helped_by_AAH_2018 &lt;- c(75530, 0, 334588, 1442297, 832829, 18641, 3488001, 14205, 474505, 302014)
 Top_10 &lt;- mutate(Top_10, People_Helped_by_AAH_2018)
 ggplot(Top_10, aes(Entity, People_Helped_by_AAH_2018)) +
